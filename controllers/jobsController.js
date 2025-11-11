@@ -1,6 +1,6 @@
 import jobsModel from "../models/jobsModel.js";
 import mongoose from 'mongoose';
-
+import moment from 'moment'
 
 //====== CREATE JOB ======
 export const createJobController = async (req, res, next) => {
@@ -91,28 +91,8 @@ export const deleteJobController = async (req, res, next) => {
 // ======= JOB STATS & FILTERS ========= 
 
 export const jobStatsController = async (req, res) => {
-    // Debug: Check what userId we're looking for
-    console.log('Looking for userId:', req.user.userId);
-
-    // First, let's see all jobs without filtering
-    const allJobs = await jobsModel.find({}).limit(5);
-    const sampleCreatedByValues = allJobs.map(job => ({
-        createdBy: job.createdBy,
-        createdByType: typeof job.createdBy,
-        createdByString: job.createdBy?.toString()
-    }));
-
-    // Try matching with string first
-    const jobsWithString = await jobsModel.find({ createdBy: req.user.userId });
-    console.log('Jobs found with string match:', jobsWithString.length);
-
-    // Try matching with ObjectId
-    const jobsWithObjectId = await jobsModel.find({
-        createdBy: mongoose.Types.ObjectId.createFromHexString(req.user.userId)
-    });
-    console.log('Jobs found with ObjectId match:', jobsWithObjectId.length);
-
     const stats = await jobsModel.aggregate([
+        // search by user jobs 
         {
             $match: {
                 createdBy: mongoose.Types.ObjectId.createFromHexString(req.user.userId)
@@ -120,21 +100,48 @@ export const jobStatsController = async (req, res) => {
         },
         {
             $group: {
-                _id: "$status",
+                _id: '$status',
                 count: { $sum: 1 }
             }
         }
     ]);
 
-    res.status(200).json({
-        totalJobs: jobsWithObjectId.length,
-        stats,
-        debug: {
-            userId: req.user.userId,
-            totalInDB: allJobs.length,
-            stringMatch: jobsWithString.length,
-            objectIdMatch: jobsWithObjectId.length,
-            sampleCreatedByValues: sampleCreatedByValues
+    //default stats 
+    const defaultStats = { 
+        pending: stats.pending || 0,
+        reject : stats.reject || 0,
+        interview: stats.interview || 0,
+
+    }
+
+    //monthly yearly stats 
+    let monthlyApplication = await jobsModel.aggregate([ 
+        { 
+            $match: { 
+                createdBy: new mongoose.Types.ObjectId(req.user.userId)
+            }
+        },
+        { 
+            $group:{ 
+                _id:{ 
+                    year:{$year: '$createdAt'},
+                    month:{$month: '$createdAt'}
+                },
+                count:{ 
+                    $sum:1
+                 }
+            }
         }
-    });
+
+    ])
+    monthlyApplication = monthlyApplication.map(item => { 
+        const {_id:{year,month},count} = item 
+        const date = moment().month(month - 1).year(year).format('MMM Y')
+        return {date, count};
+
+    })
+    .reverse();
+
+    res.status(200).json({ totalJobs: stats.length, defaultStats, monthlyApplication });
 };
+
