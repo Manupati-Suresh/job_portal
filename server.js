@@ -5,6 +5,13 @@ import express from 'express';
 import 'express-async-errors';
 import dotenv from 'dotenv';
 import colors from 'colors';
+//security packages 
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize'
+
+
+
+
 
 //routes imports 
 import testRoutes from './routes/testRoutes.js';
@@ -31,6 +38,8 @@ connectDB();
 const app = express();
 
 //middlewares 
+app.use(helmet());
+app.use(mongoSanitize());
 app.use(express.json());
 app.use(cors());
 app.use(morgan('dev'));
