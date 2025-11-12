@@ -50,7 +50,8 @@ const options = {
         },
         servers: [
             {
-                url: "http://localhost:8000"
+                url: "https://job-portal-cxnu.onrender.com/",
+                // url: "http://localhost:8000"
             }
 
         ]
